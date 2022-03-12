@@ -11,9 +11,11 @@ def all_data():
 data = all_data()
 
 # Nadpis a deklarace zdroje dat
-title = 'PROHLÍŽEČ HISTORICKÝCH DAT Z METEOROLOGICKÝCH STANIC ČHMÚ'
-st.markdown(f"<h2 style='text-align: center; color: red'>{title}</h2>", unsafe_allow_html=True)
+title = 'PROHLÍŽEČ HISTORICKÝCH KLIMATOLOGICKÝCH DAT'
+reference = 'https://www.chmi.cz/files/portal/docs/meteo/ok/open_data/Podminky_uziti_udaju.pdf'
+st.markdown(f"<h3 style='text-align: center; color: red'>{title}</h3>", unsafe_allow_html=True)
 st.write('**Zdroj dat: Český hydrometeorologický ústav (ČHMÚ)**')
+st.write("**Podmínky při využití dat: [Pravidla ČHMÚ](%s)**" % reference)
 
 # Oddělovací čára
 st.markdown('---')
