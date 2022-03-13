@@ -55,8 +55,10 @@ if station in PM.station_remarks.keys():
     st.write('Poznámka: ', PM.station_remarks[station])
 
 # Grafický výstup
-graphic_result = PM.plot_req(quantity, filter, sort, start_yr=start_year, avg=average)
-if graphic_result == 'Data nejsou k dispozici':
-    st.write('Data pro zobrazení grafu nejsou k dispozici')
+# Výsledek typu string je nutné vypsat přes st.write, zato výsledek typu pyplot se musí vypsat přes st.pyplot
+# Oboje je možné, protože metoda PlotManager.plot_req vrací buď "omluvný string", nebo graf
+result = PM.plot_req(quantity, filter, sort, start_yr=start_year, avg=average)
+if isinstance(result, str):
+    st.write(result)
 else:
-    st.pyplot(graphic_result)
+    st.pyplot(result)
