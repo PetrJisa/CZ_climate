@@ -100,19 +100,29 @@ class PlotManager:
             try:
                 xticks = range(np.min(x), np.max(x)+1)
             except TypeError:
-                return 'Data nejsou k dispozici'
+                return 'Data pro zobrazení grafu nejsou k dispozici'
         else:
             x = np.array([str(year) for year in plot_df.index])
             if len(x) > 0:
                 xticks = x
             else:
-                return 'Data nejsou k dispozici'
+                return 'Data pro zobrazení grafu nejsou k dispozici'
 
         # Titulek grafu - liší se podle toho, zda zobrazujeme roky, nebo měsíce
         if filter == 'rok':
             chart_ttl = f'Stanice: {self.location}, roční data'
         else:
             chart_ttl = f'Stanice: {self.location}, data za měsíc {filter}'
+
+        # Ošetření případu, kdy y-vektor obsahuje samé nuly
+        # K tomu dochází typicky, když chci počty ledových dnů nebo max. výšku sněhu v červenci
+        # V takovém případě je dobré, aby metoda místo grafu vrátila "omluvný string"
+        if np.max(y) == 0:
+            if 'dny' in quantity:
+                return f'{quantity} se na dané stanici a při zvoleném nastavení podmínek nevyskytují'
+            else:   # Podle mě pouze případ, kdy chci max. výšku sněhu, tj. veličinu "Sníh"
+                return f'{quantity} se na dané stanici a při zvoleném nastavení nevyskytl'
+
 
 
         ax.bar(x, y, edgecolor='black', linewidth=1, color=barclr, label=quantity)
