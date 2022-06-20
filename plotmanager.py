@@ -9,7 +9,9 @@ class PlotManager:
 
     quantities = \
         {'Srážky': {'column': 'Precipitations_sum', 'color': 'blue', 'ylabel': 'Suma srážek (mm)'},
-         'Teplota': {'column': 'Temperatures_avg', 'color': 'green', 'ylabel': 'Průměrná teplota (°C)'},
+         'Teplota - průměr': {'column': 'Temperatures_avg', 'color': 'green', 'ylabel': 'Průměrná teplota (°C)'},
+         'Teplota - minimum': {'column': 'Temperatures_min_min', 'color': 'purple', 'ylabel': 'Minimální teplota (°C)'},
+         'Teplota - maximum': {'column': 'Temperatures_max_max', 'color': 'red', 'ylabel': 'Maximální teplota (°C)'},
          'Sluneční svit': {'column': 'Sunshine_sum', 'color': 'yellow', 'ylabel': 'Úhrn slunečního svitu (hod)'},
          'Sníh': {'column': 'Snow_height_max', 'color': 'lightblue', 'ylabel': 'Maximum sněhové pokrývky (cm)'},
          'Vítr': {'column': 'Wind_avg', 'color': 'brown', 'ylabel': 'Průměrná rychlost větru (m/s)'},
@@ -52,6 +54,19 @@ class PlotManager:
         '''Creates the plot according to the requirements from the user, which are defined by following parameters
         filter - month (leden, únor... prosinec) or year (rok)
         sorting - asc is ascending, desc is descending, default None (sorted by time)'''
+
+        # Funkce pro vykreslování regresní spojnice trendu, je třeba upravit na míru
+        # A pak dát tam, kde je větev "if razeni == chronologicke"... protože do ostatních grafů se kreslit nebude
+        def regline(ax, x, y, linestyle='-', color='black', linewidth=2.5):
+            '''Function for construction of linear regression line'''
+            a, b = np.polyfit(x, y, 1)
+            corr = np.corrcoef(x, y)[0, 1]
+            reg_x = np.linspace(x.min(), x.max(), 3)
+            reg_y = a * reg_x + np.array(3 * [b])
+
+            ax.plot(reg_x, reg_y, label='Lineární trend', linestyle=linestyle, color=color, linewidth=linewidth)
+
+
         # RCparams
         plt.rcParams.update({'font.size': 13, 'text.color': 'black', 'axes.labelcolor': 'black'})
 
@@ -133,8 +148,9 @@ class PlotManager:
         ax.set_title(chart_ttl)
         ax.grid(linewidth=1, color='grey')
 
-        if sorting == 'chronologické':   # Klouzavý průměr v případě zobrazování nesortovaných dat
+        if sorting == 'chronologické':   # Klouzavý průměr a spojnice trendu v případě zobrazování nesortovaných dat
             ax.plot(x, plot_df['Rolling_5y'], label='Klouzavý průměr (5 let)', color='black', linewidth=1.8)
+            regline(ax, x, y, linestyle='-.', color='black', linewidth=1.5)
 
         # Klimatický normál, je-li vybrána jiná volba, než 'nezobrazovat'
 
