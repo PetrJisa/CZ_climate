@@ -55,130 +55,142 @@ class PlotManager:
         filter - month (leden, únor... prosinec) or year (rok)
         sorting - asc is ascending, desc is descending, default None (sorted by time)'''
 
-        # Funkce pro vykreslování regresní spojnice trendu, je třeba upravit na míru
-        # A pak dát tam, kde je větev "if razeni == chronologicke"... protože do ostatních grafů se kreslit nebude
-        def regline(ax, x, y, linestyle='-', color='black', linewidth=2.5):
+
+        def create_plot_dataframe():
+            '''Creates DataFrame which is necessary as a data source for all plots'''
+
+            # Sloupec, který si pak vezmu z gigantické DataFrame self.data (odpovídá vybrané meteo veličině)
+            column = PlotManager.quantities[quantity]['column']
+
+            # Agregace výchozí tabulky self.data. Záleží, jestli chci charakteristické dny, nebo jinou veličinu
+            # U charakteristických dní totiž nejsou v řádku "rok" hodnoty, což je třeba řešit agregací
+            if ('dny' in quantity) and (filter == 'rok'):
+                plot_df = self.data[[column]].loc[start_yr:].groupby('Rok').sum().dropna()
+            else:
+                plot_df = self.data.loc[start_yr:].query("Měsíc == @filter")[[column]].dropna()
+
+            # Už v tuto chvíli je možné, že plot_df je prázdná, nejsou-li data dostupná (př. Děčín, sluneční svit)
+            # V tom případě prázdnou DataFrame rovnou vracím, a zbytek funkce se nevykoná
+            # Graf se z ní stejně dělat nebude (což pak musím v proceduře pro graf rovněž zaimplementovat)
+            if plot_df.empty:
+                return plot_df
+
+            # Tady je výchozí DataFrame tříděna, je-li parametr sorting asc nebo desc
+            # Dále v takovém případě měním roky na string, má-li být tabulka řazená (protože graf pak musí mít takové x)
+            if sorting == 'vzestupné':
+                plot_df = plot_df.sort_values(by=column, ascending=True)
+                plot_df.index = plot_df.index.map(str)
+            elif sorting == 'sestupné':
+                plot_df = plot_df.sort_values(by=column, ascending=False)
+                plot_df.index = plot_df.index.map(str)
+
+            return plot_df
+
+
+        def basic_bar_plot(ax, df):
+            '''Creates the basic bar chart without trend lines, but with all axes objects'''
+
+            # x, y, barva sloupců, popisek osy y (proměnné, nezávislé na requestu)
+            x = df.index
+            y = df.iloc[:,0]
+            barclr = PlotManager.quantities[quantity]['color']
+            ylbl = PlotManager.quantities[quantity]['ylabel']
+
+            # Popisky osy x - rozdílné podle toho, zda se data řadí (vzestupně/sestupně) nebo je řazení chronologické
+            if sorting == 'chronologické':
+                xticks = range(min(x), max(x) + 1)
+            else:
+                xticks = x
+
+            # Titulek grafu - liší se podle toho, zda zobrazujeme roky, nebo měsíce
+            if filter == 'rok':
+                chart_ttl = f'Stanice: {self.location}, roční data'
+            else:
+                chart_ttl = f'Stanice: {self.location}, data za měsíc {filter}'
+
+            # Kompletní nastavení grafu
+            ax.bar(x, y, edgecolor='black', linewidth=1, color=barclr, label=quantity)
+            ax.set_ylabel(ylbl)
+            ax.set_xlabel('Rok')
+            ax.set_xticks(xticks)
+            ax.set_xticklabels(xticks, rotation=75)
+            ax.set_title(chart_ttl)
+            ax.grid(linewidth=1, color='grey')
+
+
+        def climatic_normal(ax, df):
+            '''Creates the plot of climatic normal'''
+            # Je třeba sáhnout zpět k self.data, protože DataFrame pro graf je oseknutá od start_yr
+
+            column = PlotManager.quantities[quantity]['column']  # Sloupec, který budu hledat v self.data
+            start_year, end_year = int(avg[:4]), int(avg[-4:])  # Startovní a konečný rok
+            x = df.index    # x, které se bude lišit podle toho, jaká je výchozí dataframe (soulad s hlavním grafem)
+
+            if ('dny' in quantity) and (filter == 'rok'):  # Výpočet průměru pro danou charakteristiku (fuj)
+                result_avg = np.mean(self.data[[column]].loc[start_year:end_year + 1].groupby('Rok').sum()[column])
+            else:
+                result_avg = np.mean(self.data.loc[start_year:end_year + 1].query("Měsíc == @filter")[column])
+
+            ax.plot(x, np.array(len(x) * [result_avg]), label=f'Průměr {avg}', color='black', linewidth=2,
+                    linestyle='--')
+
+
+        def regline(ax, df):
             '''Function for construction of linear regression line'''
+            x = df.index
+            y = df.iloc[:,0]
+
             a, b = np.polyfit(x, y, 1)
-            corr = np.corrcoef(x, y)[0, 1]
             reg_x = np.linspace(x.min(), x.max(), 3)
             reg_y = a * reg_x + np.array(3 * [b])
 
-            ax.plot(reg_x, reg_y, label='Lineární trend', linestyle=linestyle, color=color, linewidth=linewidth)
+            ax.plot(reg_x, reg_y, label='Lineární trend', linestyle='-.', color='black', linewidth=1.5)
 
 
-        # RCparams
-        plt.rcParams.update({'font.size': 13, 'text.color': 'black', 'axes.labelcolor': 'black'})
+        def rolling_average(ax, df):
+            '''Function for plotting 5 years rolling average'''
+            x = df.index
+            y = df.iloc[:, 0].rolling(5).mean()
+            ax.plot(x, y, label='Klouzavý průměr (5 let)', color='black', linewidth=1.8)
 
-        # Sloupec, který si bereme z DataFrame
-        column = PlotManager.quantities[quantity]['column']
+        # ZDE ZAČÍNÁ TĚLO FUNKCE PLOT_REQ
 
-        # Tady tvořím výchozí DataFrame, přičemž záleží, jestli chci charakteristické dny, nebo jinou veličinu
-        # U charakteristických dní totiž nejsou v řádku "rok" hodnoty, což je třeba řešit agregací
-        if ('dny' in quantity) and (filter == 'rok'):
-            plot_df = self.data[[column]].loc[start_yr:].groupby('Rok').sum()
-        else:
-            plot_df = self.data.loc[start_yr:].query("Měsíc == @filter")[[column]]
+        # Výchozí plot_dataframe pro všechny grafy
+        plot_dataframe = create_plot_dataframe()
 
-        # Tady vyhodíme řádky, ve kterých je hodnota NaN
-        plot_df = plot_df.dropna()
+        # Případ, kdy je plot_dataframe prázdná
+        # Rovnou vracím "omluvný string" příslušného typu a procedury pro tvorbu grafů se nevolají
+        if plot_dataframe.empty:
+            return 'Data pro zobrazení grafu nejsou k dispozici'
 
-        # Tady je výchozí DataFrame tříděna, je-li parametr sorting asc nebo desc
-        # Je-li parametr sorting defaultní (None), přidávám sloupec s 5-letým klouzavým průměrem
-        if sorting == 'chronologické':
-            plot_df['Rolling_5y'] = plot_df[column].rolling(5).mean()
-        elif sorting == 'vzestupné':
-            plot_df = plot_df.sort_values(by=column, ascending=True)
-        elif sorting == 'sestupné':
-            plot_df = plot_df.sort_values(by=column, ascending=False)
-
-
-        # Základní objektová notace pro graf
-        fig, ax = plt.subplots(figsize=(12, 8))
-
-        # Proměnné, které se nemění v závislosti na requestu, vyjma výběru lokality
-        y = plot_df[column]
-        barclr = PlotManager.quantities[quantity]['color']
-        ylbl = PlotManager.quantities[quantity]['ylabel']
-
-        # Parametry, které budou různé podle parametru sorting
-        # Co se týká pole x, musí se při sortovaných výstupech převést na stringové
-        # Pokud se nechá jako integer, osa x je numerická a vše se vynáší na pozici podle indexu
-        # Tím pádem se sabotuje sorting a ze seřazené dataframe je opět zdánlivě neseřazený graf
-        # Vytváří se totiž propojení mezi y (typ series) a x (typ index) a graf se uspořádává podle uspořádané osy x
-        # Je to analogie s klasickým bodovým grafem (tam též jdou hodnoty v libovolném pořadí, ale přímku to nenarušuje)
-
-        # Dále je zde ošetření případu, kdy pro dané období nejsou data
-        # V tom případě je rovnou funkce vrací chybový string, namísto pokračování a finálního tisku prázdného grafu
-        if sorting == 'chronologické':
-            x = plot_df.index
-            try:
-                xticks = range(np.min(x), np.max(x)+1)
-            except TypeError:
-                return 'Data pro zobrazení grafu nejsou k dispozici'
-        else:
-            x = np.array([str(year) for year in plot_df.index])
-            if len(x) > 0:
-                xticks = x
-            else:
-                return 'Data pro zobrazení grafu nejsou k dispozici'
-
-        # Titulek grafu - liší se podle toho, zda zobrazujeme roky, nebo měsíce
-        if filter == 'rok':
-            chart_ttl = f'Stanice: {self.location}, roční data'
-        else:
-            chart_ttl = f'Stanice: {self.location}, data za měsíc {filter}'
-
-        # Ošetření případu, kdy y-vektor obsahuje samé nuly
-        # K tomu dochází typicky, když chci počty ledových dnů nebo max. výšku sněhu v červenci
-        # V takovém případě je dobré, aby metoda místo grafu vrátila "omluvný string"
-        if np.max(y) == 0:
+        # Dále případy, kdy plot_dataframe není prázdná, ale daný jev se nevyskytuje (sníh v červenci atd.)
+        # Opět se rovnou vrátí "omluvný string" příslušného typu a procedury pro tvorbu grafů se nevolají
+        if max(plot_dataframe.iloc[:,0]) == 0:
             if 'dny' in quantity:
                 return f'{quantity} se na dané stanici a při zvoleném nastavení podmínek nevyskytují'
             else:   # Podle mě pouze případ, kdy chci max. výšku sněhu, tj. veličinu "Sníh"
                 return f'{quantity} se na dané stanici a při zvoleném nastavení nevyskytl'
 
+        # Pokud program nespadl do jedné ze 2 předchozích podmínek, jde se na grafy
+        # Vždy se v tomto případě dělá základní graf, s klimatickým normálem
+        fig, ax = plt.subplots(figsize=(12, 8))
+        basic_bar_plot(ax, plot_dataframe)
+        climatic_normal(ax, plot_dataframe)
 
+        # A pokud je řazení chronologické, tak se přidají ještě klouzavý průměr a lineární trend
+        # Později předělám, plot_reg bude mít ještě 2 parametry - jestli vykreslovat, nebo nevykreslovat tyto řady
+        # A ve streamlitu se pak volba klouzavého a lineárního trendu bude objevovat, když bude chronologické řazení
+        if sorting == 'chronologické':
+            regline(ax, plot_dataframe)
+            rolling_average(ax, plot_dataframe)
 
-        ax.bar(x, y, edgecolor='black', linewidth=1, color=barclr, label=quantity)
-        ax.set_ylabel(ylbl)
-        ax.set_xlabel('Rok')
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(xticks, rotation=75)
-        ax.set_title(chart_ttl)
-        ax.grid(linewidth=1, color='grey')
-
-        if sorting == 'chronologické':   # Klouzavý průměr a spojnice trendu v případě zobrazování nesortovaných dat
-            ax.plot(x, plot_df['Rolling_5y'], label='Klouzavý průměr (5 let)', color='black', linewidth=1.8)
-            regline(ax, x, y, linestyle='-.', color='black', linewidth=1.5)
-
-        # Klimatický normál, je-li vybrána jiná volba, než 'nezobrazovat'
-
-        start_year, end_year = int(avg[:4]), int(avg[-4:]) # Startovní a konečný rok
-
-        if ('dny' in quantity) and (filter == 'rok'):   # Výpočet průměru pro danou charakteristiku (fuj)
-            result_avg = np.mean(self.data[[column]].loc[start_year:end_year + 1].groupby('Rok').sum()[column])
-        else:
-            result_avg = np.mean(self.data.loc[start_year:end_year + 1].query("Měsíc == @filter")[column])
-
-        ax.plot(x, np.array(len(x)*[result_avg]), label = f'Průměr {avg}', color='black', linewidth=2, linestyle='--')
-
-        ax.legend() # Až nakonec, aby se do ní propsal případně i klimatický normál a případně klouzavý průměr
+        # A nakonec legenda, aby se do ní propsaly všechny labely
+        ax.legend()
 
         return fig
 
 if __name__ == '__main__':
     data = pd.read_csv('Data.csv')
-    test_inst = PlotManager('Děčín', data)
-    df = test_inst.data
-
-    sunshine_df = df[df['Měsíc'] == 'rok'][['Měsíc', 'Sunshine_sum']].dropna()
-    precipitations_df = df[df['Měsíc'] == 'rok'][['Měsíc', 'Precipitations_sum']].dropna()
-
-    sunshine_df['5Y_AVG'] = sunshine_df['Sunshine_sum'].rolling(5).mean()
-    precipitations_df['5Y_AVG'] = precipitations_df['Precipitations_sum'].rolling(5).mean()
-
-    print(sunshine_df)
-    print(precipitations_df)
-    print(sunshine_df.index)
-    print(precipitations_df.index)
+    test_inst = PlotManager('Teplice', data)
+    plot = test_inst.plot_req('Srážky', 'rok', 'chronologické', 1980)
+    plt.show()
