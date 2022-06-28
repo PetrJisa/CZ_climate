@@ -44,6 +44,17 @@ with col2:
 with col3:
     average = st.radio('Staniční normál', ['1961 - 1990', '1981 - 2010'])
 
+# Speciální widgety při chronologickém řazení - lineární trend a klouzavý průměr
+if sort == 'chronologické':
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        lintrend = st.checkbox('Lineární trend')
+
+    with col2:
+        roll_avg = st.checkbox('Klouzavý průměr')
+
 # Oddělovací čára
 st.markdown('---')
 
@@ -54,10 +65,18 @@ PM = PlotManager(station, data)
 if station in PM.station_remarks.keys():
     st.write('Poznámka: ', PM.station_remarks[station])
 
+# Geneze výsledku (omluvná hláška nebo graf, obstarává metoda PlotManager.plot_req(...)
+# Liší se případ, kdy je řazení chronologické, nebo sestupné/vzestupné
+# U chronologického řazení mohou parametry lintrend a roll_avg nabývat hodnoty True
+# Podle toho, co si vybere uživatel pomocí checboxů, které u nechronologických řazení nejsou k dispozici
+if sort == 'chronologické':
+    result = PM.plot_req(quantity, filter, sort, start_yr=start_year, avg=average, lintrend=lintrend, roll_avg=roll_avg)
+else:
+    result = PM.plot_req(quantity, filter, sort, start_yr=start_year, avg=average)
+
 # Grafický výstup
 # Výsledek typu string je nutné vypsat přes st.write, zato výsledek typu pyplot se musí vypsat přes st.pyplot
 # Oboje je možné, protože metoda PlotManager.plot_req vrací buď "omluvný string", nebo graf
-result = PM.plot_req(quantity, filter, sort, start_yr=start_year, avg=average)
 if isinstance(result, str):
     st.write(result)
 else:
