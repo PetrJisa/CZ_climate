@@ -50,7 +50,8 @@ class PlotManager:
         self.data = data.query("Stanice == @location").set_index('Rok')
 
 
-    def plot_req(self, quantity: str, filter: str, sorting='chronologické', start_yr=1980, avg='1961 - 1990'):
+    def plot_req(self, quantity: str, filter: str, sorting='chronologické', start_yr=1980, avg='1961 - 1990',
+                 lintrend = False, roll_avg = False):
         '''Creates the plot according to the requirements from the user, which are defined by following parameters
         filter - month (leden, únor... prosinec) or year (rok)
         sorting - asc is ascending, desc is descending, default None (sorted by time)'''
@@ -180,8 +181,10 @@ class PlotManager:
         # A pokud je řazení chronologické, tak se přidají ještě klouzavý průměr a lineární trend
         # Později předělám, plot_reg bude mít ještě 2 parametry - jestli vykreslovat, nebo nevykreslovat tyto řady
         # A ve streamlitu se pak volba klouzavého a lineárního trendu bude objevovat, když bude chronologické řazení
-        if sorting == 'chronologické':
+        if lintrend:
             regline(ax, plot_dataframe)
+
+        if roll_avg:
             rolling_average(ax, plot_dataframe)
 
         # A nakonec legenda, aby se do ní propsaly všechny labely
