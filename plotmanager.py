@@ -125,7 +125,7 @@ class PlotManager:
 
             column = PlotManager.quantities[quantity]['column']  # Sloupec, který budu hledat v self.data
             start_year, end_year = int(avg[:4]), int(avg[-4:])  # Startovní a konečný rok
-            x = df.index    # x, které se bude lišit podle toho, jaká je výchozí dataframe (soulad s hlavním grafem)
+            x = np.array(df.index)    # x, které se bude lišit podle toho, jaká je výchozí dataframe (soulad s hlavním grafem)
 
             if ('dny' in quantity) and (filter == 'rok'):  # Výpočet průměru pro danou charakteristiku (fuj)
                 result_avg = np.mean(self.data[[column]].loc[start_year:end_year + 1].groupby('Rok').sum()[column])
