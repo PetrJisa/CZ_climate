@@ -150,8 +150,8 @@ class PlotManager:
 
         def rolling_average(ax, df):
             '''Function for plotting 5 years rolling average'''
-            x = df.index
-            y = df.iloc[:, 0].rolling(5).mean()
+            x = np.array(df.index)
+            y = np.array(df.iloc[:, 0].rolling(5).mean())
             ax.plot(x, y, label='Klouzavý průměr (5 let)', color='black', linewidth=1.8)
 
         # ZDE ZAČÍNÁ TĚLO FUNKCE PLOT_REQ
