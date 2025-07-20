@@ -3,7 +3,7 @@ import pandas as pd
 from plotmanager import PlotManager
 
 
-@st.cache
+@st.cache_data
 def all_data():
     return pd.read_csv('Data.csv')
 
