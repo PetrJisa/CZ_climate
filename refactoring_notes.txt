@@ -1,0 +1,11 @@
+Upgrade projektu - výpis statistických údajů pod graf (nejlépe v nějaké hezky strukturované tabulce)
+
+Zásahy do modulu plotmanager.py: 
+1) nová class variable - slovník, obsahující defaultní hodnoty momentální volby zobrazovaných parametrů (lokace, filtr, období, regrese, klouzavý průměr apod)
+2) initor bude mít tuto novou class vairable jako defaultní parametr, aby se dala vytvářet instance s defaultními hodnotami volby (dobré zároveň pro ladění kódu v plotmanager.py, zatímco při volání z CZ_climate.py se bude instance vytvářet se slovníkem, vyplněným aktuálními volbami uživatele ze skriptu CZ_climate.py)
+3) slovník s hodnotami momentální volby (default obsah class variable, při volání pak reálné volby ze streamlitu), bude též instančním atributem
+4) instanční metoda pro vytvoření dataframe zdrojových dat nebude uvnitř metody pro vytvoření grafu, protože její údaje se budou používat též pro výpočet statistiky do tabulky pod graf, tj. půjde o novou samostatnou metodu, která zároveň rovnou zahodí vše nepotřebné (instance bude mít atribut dataframe např. pouze s vybranou veličinou)
+5) vstupním parametrem pro metodu, vytvářející dataframe zdrojových dat, bude též slovník momentální volby
+6) metoda pro vytvoření grafu bude též mít na vstupu slovník volby (a pak by se dala velmi pohodlně volat metoda, vracející dataframe zdrojových dat, v těle této metody)
+7) dále bude implementována nová instanční metoda pro přípravu dat k naplnění tabulky statistických údajů
+8) v modulu CZ_climate.py bude přidán tisk tabulky statistických údajů, pro které se využije rovněž dataframe zdrojových dat
