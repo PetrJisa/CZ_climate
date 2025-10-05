@@ -63,13 +63,13 @@ class PlotManager:
     def _prepare_data_accessibility_tbl(cls):
         source_data = cls.source_data
 
-        id_vars = ['Stanice', 'Rok']  # 👈 include station here
+        id_vars = ['Stanice', 'Rok']  # include station here
         quantity_cols = [col for col in source_data.columns if col not in id_vars]
 
         melted = source_data.melt(id_vars=id_vars, var_name='Veličina', value_name='value')
         melted = melted.dropna(subset=['value'])
 
-        # 👇 group by both station and quantity
+        # group by both station and quantity
         cls.data_accessibility = (
             melted.groupby(['Stanice', 'Veličina'])
                 .agg(rok_min=('Rok', 'min'), rok_max=('Rok', 'max'))

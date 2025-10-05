@@ -1,5 +1,3 @@
-# plotmanager je po refactoringu, je treba provest tez refactoring tohoto modulu, aby byl kompatibilni
-
 import streamlit as st
 import pandas as pd
 from plotmanager import PlotManager
