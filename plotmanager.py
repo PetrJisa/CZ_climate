@@ -223,14 +223,12 @@ class PlotManager:
             else:
                 yr_min = int(self.selection['avg'][-12:-7])
                 yr_max = int(self.selection['avg'][-4:])
-                nstats = self.compute_stats(yr_min, yr_max)
 
-                # Funkce pocita prumer, jen pokud jsou k dispozici data za normalove obdobi
-                # Kdyz nejsou k dispozici data, return None zajisti, ze se ani graf nebude kreslit
-                if not nstats:
+                # Funkce pocita prumer a kresli prumer, jen pokud jsou k dispozici data za cele normalove obdobi
+                if self.required_data.loc[yr_min:yr_max].shape[0] < 30:
                     return None
                 else:
-                    yavg = nstats['mean']
+                    yavg = self.compute_stats(yr_min, yr_max)['mean']
 
             ax.plot(x,
                     np.array(len(x) * [yavg]),
