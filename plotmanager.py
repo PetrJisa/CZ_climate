@@ -52,28 +52,59 @@ class PlotManager:
          'Vizovice': 'Sluneční svit k dispozici až od roku 2007'}
 
 
-    @classmethod
-    def _prepare_source_data(cls):
-        col_dict = {value['column']:key for key, value in cls.quantities.items()}
-        source_data = pd.read_csv('Data.csv').rename(columns=col_dict)
-        cls.source_data = source_data
+    source_data = pd.read_csv('Data.csv')
 
 
     @classmethod
     def _prepare_data_accessibility_tbl(cls):
+
+        def climatic_normal(df, eval_col, start_year, end_year):
+            '''Vypocet klimatickeho normalu za obdobi, ohranicene start_year a end_year
+            Pokud jsou k dispozici data za vsechny roky, funkce vrati klimaticky normal
+            V opacnem pripade vrati hodnotu NaN
+            Promenna eval_col je nazev sloupce v dataframe, ze ktereho pocitam klimaticky normal'''
+
+            # df je obecne jakakoli dataframe, vcetne dataframe slice objektu dataframe.groupby()
+            sub = df[(df['Rok'] >= start_year) & (df['Rok'] <= end_year)]
+
+            # overeni, zda nechybi data pro vypocet klimatickeho normalu
+            expected_years = end_year - start_year + 1
+            actual_years = sub['Rok'].nunique()
+
+            # Chybi data --> vratim nan, jinak vracim normal (nutne specifikovat, z jakeho sloupce)
+            if actual_years < expected_years:
+                return float('nan')
+            else:
+                return sub[eval_col].mean() # dirty solution - spoleham se, ze v cilove dataframe bude sloupec value
+
+        def applied_functions(df, eval_col):
+            '''Sestavuje pandas.Serie s nadefinovanymi funkcemi
+            Tato je pak predana metode dataframe.apply()
+            Promenna eval_col je sloupec v dataframe, ze ktereho pocitam normal'''
+
+            return pd.Series({
+                'min_year': df['Rok'].min(),
+                'max_year': df['Rok'].max(),
+                'Normál 1961 - 1990': climatic_normal(df, eval_col, 1961, 1990),
+                'Normál 1981 - 2010': climatic_normal(df, eval_col, 1981, 2010),
+                'Normál 1991 - 2020': climatic_normal(df, eval_col, 1991, 2020)
+                })
+
         source_data = cls.source_data
 
-        id_vars = ['Stanice', 'Rok']  # include station here
-        quantity_cols = [col for col in source_data.columns if col not in id_vars]
+        # Vsechny sloupce, ktere nechceme pivotovat
+        id_vars = ['Stanice', 'Měsíc', 'Rok']
 
+        # Pivotace - nazvy velicin do sloupce 'Veličina', hodnoty do sloupce 'value', dropna() podle 'value'
         melted = source_data.melt(id_vars=id_vars, var_name='Veličina', value_name='value')
         melted = melted.dropna(subset=['value'])
 
-        # group by both station and quantity
-        cls.data_accessibility = (
-            melted.groupby(['Stanice', 'Veličina'])
-                .agg(rok_min=('Rok', 'min'), rok_max=('Rok', 'max'))
-        )
+        # Agregace melted tabulky s vypoctem, ktery ridi pd.Serie applied_functions
+        cls.data_accessibility = (melted
+                                  .groupby(['Stanice', 'Měsíc', 'Veličina'])
+                                  .apply(lambda x: applied_functions(x, 'value'), include_groups=False)
+                                  )
+
 
     def __init__(self, selection):
 
@@ -101,25 +132,16 @@ class PlotManager:
                          .loc[:,['Měsíc', slc['quantity']]]
                         )
 
-        # Specificky postup, pokud jsou jako velicina vybrany charakteristicke dny a zaroven je vybran filtr na roky
-        # Tato data nejsou pro uroven roku predagregovana, jinak je vsak postup stejny
         # Zkousim, zda mam ve vybranem obdobi dostupna data
         # Pokud nemam ve vybranem obdobi zadna data, vracim prazdnou dataframe a dalsi metody s tim pracuji
-        # V opacnem pripade dodelam transformaci dat, rozdilnou pro dva vyse uvedene pripady
-        # Nevracim vsak pouze data pro vybrane obdobi
+        # V opacnem pripade vratim data, ne vsak pouze pro vybrane obdobi
         # Protoze muzeme chtit zobrazit klimaticky normal, ktery nemusi cely spadat do vybraneho obdobi
-        if ('dny' in slc['quantity']) and (slc['filter'] == 'rok'):
-            acc_test_data = req_data.loc[slc['start_yr']:slc['end_yr']].dropna()
-            if acc_test_data.empty:
-                return acc_test_data
-            else:
-                return req_data.loc[:,[slc['quantity']]].groupby('Rok').sum().dropna()
+
+        acc_test_data = req_data.query("Měsíc == @slc['filter']").loc[slc['start_yr']:slc['end_yr']].dropna()
+        if acc_test_data.empty:
+            return acc_test_data
         else:
-            acc_test_data = req_data.query("Měsíc == @slc['filter']").loc[slc['start_yr']:slc['end_yr']].dropna()
-            if acc_test_data.empty:
-                return acc_test_data.query("Měsíc == @slc['filter']").dropna()
-            else:
-                return req_data.query("Měsíc == @slc['filter']").loc[:,[slc['quantity']]].dropna()
+            return req_data.query("Měsíc == @slc['filter']").loc[:,[slc['quantity']]].dropna()
 
 
     def _create_main_plot_dataframe(self):
@@ -196,7 +218,7 @@ class PlotManager:
                 xticks = x
 
             # Titulek grafu - liší se podle toho, zda zobrazujeme roky, nebo měsíce
-            if filter == 'rok':
+            if self.selection['filter'] == 'rok':
                 chart_ttl = f"Stanice: {self.selection['location']}, roční data"
             else:
                 chart_ttl = f"Stanice: {self.selection['location']}, data za měsíc {self.selection['filter']}"
@@ -214,25 +236,23 @@ class PlotManager:
         def avgline(ax):
             '''Creates the average line plot'''
 
+            slc = self.selection
+
             x = self.main_plot_df.index
 
             if self.selection['avg'] == 'Vybrané období':
                 yavg = self.slc_period_stats['mean']
-                yr_min = self.selection['start_yr']
-                yr_max = self.selection['end_yr']
+                label = f"Průměr {slc['start_yr']} - {slc['end_yr']}"
             else:
-                yr_min = int(self.selection['avg'][-12:-7])
-                yr_max = int(self.selection['avg'][-4:])
-
-                # Funkce pocita prumer a kresli prumer, jen pokud jsou k dispozici data za cele normalove obdobi
-                if self.required_data.loc[yr_min:yr_max].shape[0] < 30:
-                    return None
-                else:
-                    yavg = self.compute_stats(yr_min, yr_max)['mean']
+                yavg = (PlotManager
+                    .data_accessibility
+                    .loc[(slc['location'], slc['filter'], slc['quantity']), slc['avg']]
+                )
+                label = slc['avg']
 
             ax.plot(x,
                     np.array(len(x) * [yavg]),
-                    label=f'Průměr {yr_min} - {yr_max}',
+                    label=label,
                     color='black',
                     linewidth=2,
                     linestyle='--')
@@ -302,24 +322,24 @@ class PlotManager:
 
         return fig
 
-# Az tady musim incializovat class variables, protoze uvnitr class nelze volat class methods
-PlotManager._prepare_source_data()
+# Az tady musim incializovat class variable data_accessibility, protoze uvnitr class nelze volat class methods
 PlotManager._prepare_data_accessibility_tbl()
 
 if __name__ == '__main__':
     selection = \
         {'location': 'Cheb',
          'filter': 'rok',
-         'quantity': 'Sluneční svit',
+         'quantity': 'Letní dny',
          'sorting': 'chronologické',
-         'start_yr': 2010,
+         'start_yr': 1961,
          'end_yr': 2020,
-         'avg': 'Vybrané období',
+         'avg': 'Normál 1961 - 1990',
          'lintrend': True,
-         'roll_avg_window': 3
+         'roll_avg_window': 10
          }
 
 
+    print(PlotManager.data_accessibility)
     test_inst = PlotManager(selection)
     test_inst.plot_req()
     plt.show()

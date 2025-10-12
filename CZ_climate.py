@@ -9,10 +9,21 @@ lintrend = False
 
 @st.cache_data
 def data_accessibility():
+    '''Metadata pro handling nabidky v jednotlivych widgets'''
     return PlotManager.data_accessibility
+
 
 # Veškerá data a udaje o jejich dostupnosti v proměnných (využití cache pro zrychlení aplikace)
 data_accessibility = data_accessibility()
+
+
+def average_selection(station, filter, quantity):
+    '''Sestavuje nabidku prumeru, ktere lze zobrazit v grafu v zavislosti na dostupnosti dat pro jejich vypocet'''
+    accessible_selection = ['Vybrané období']
+    cols = [col for col in data_accessibility.columns if col.startswith('Normál')]
+    normals = data_accessibility.loc[[(station, filter, quantity)], cols].dropna(how='all', axis=1).columns
+    accessible_selection.extend(normals)
+    return accessible_selection
 
 # Nadpis a deklarace zdroje dat
 title = 'PROHLÍŽEČ HISTORICKÝCH KLIMATOLOGICKÝCH DAT'
@@ -24,7 +35,7 @@ st.write("**Podmínky při využití dat: [Pravidla ČHMÚ](%s)**" % reference)
 # Oddělovací čára
 st.markdown('---')
 
-# Hlavní widgety - stanice, veličina, počáteční rok
+# Hlavní widgety - stanice, veličina, filtr (vybraný měsíc nebo data za celý rok)
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -35,20 +46,21 @@ with col2:
     quantity = st.selectbox('Měřená veličina', PlotManager.quantities.keys())
 
 with col3:
-    year_min = data_accessibility.loc[(station, quantity), 'rok_min']
-    year_max = data_accessibility.loc[(station, quantity), 'rok_max']
-    start_yr, end_yr = st.slider('Obdobi', year_min, year_max, (year_min, year_max))
+    filter = st.selectbox('Filtr', PlotManager.filters)
+
 
 # Vedlejší widgety - filtr měsíčních dat, řazení, zobrazení průměru
 
 with col1:
-    filter = st.selectbox('Filtr', PlotManager.filters)
+    year_min = int(data_accessibility.loc[(station, filter, quantity), 'min_year'])
+    year_max = int(data_accessibility.loc[(station, filter, quantity), 'max_year'])
+    start_yr, end_yr = st.slider('Obdobi', year_min, year_max, (year_min, year_max))
 
 with col2:
     sorting = st.radio('Řazení', ['chronologické', 'vzestupné', 'sestupné'])
 
 with col3:
-    average = st.radio('Zobrazený průměr', PlotManager.avg_selections)
+    average = st.radio('Zobrazený průměr', average_selection(station, filter, quantity))
 
 # Specialni widgety pri chronologickém razeni - linearni trend a klouzavy prumer
 # Nove sloupce pomhaji udrzet format, col6 je placeholder
@@ -102,3 +114,5 @@ if isinstance(main_result, str):
     st.write(main_result)
 else:
     st.pyplot(main_result)
+
+# print(average_selection('Cheb', 'rok', 'Sluneční svit'))
