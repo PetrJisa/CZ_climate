@@ -158,6 +158,8 @@ class PlotManager:
         stats['Minimum'] = float(eval_data.min())
         stats['Maximum'] = float(eval_data.max())
         stats['Směrodatná odchylka'] = float(eval_data.std())
+        stats['Dolní tercil'] = float(np.quantile(eval_data, 1/3))
+        stats['Horní tercil'] = float(np.quantile(eval_data, 2/3))
 
         # Dale regrese
         if regression:
@@ -321,8 +323,8 @@ class PlotManager:
         if kind == "stat":
             keys = ['Průměr', 'Minimum', 'Maximum', 'Směrodatná odchylka']
             dict_ = {k:f'{v:.1f}' for k,v in self.slc_period_stats.items() if k in keys}
-            norm_lbound = self.slc_period_stats['Průměr'] - self.slc_period_stats['Směrodatná odchylka']
-            norm_ubound = self.slc_period_stats['Průměr'] + self.slc_period_stats['Směrodatná odchylka']
+            norm_lbound = self.slc_period_stats['Dolní tercil']
+            norm_ubound = self.slc_period_stats['Horní tercil']
             dict_['Interval normálních hodnot'] = f'{norm_lbound:.1f} - {norm_ubound:.1f}'
         elif kind == "reg":
             keys = ['a', 'b']
@@ -354,6 +356,5 @@ if __name__ == '__main__':
 
 
     test_inst = PlotManager(selection)
-    print(test_inst.table_req('reg'))
-    # test_inst.plot_req()
-    # plt.show()
+    test_inst.plot_req()
+    plt.show()
