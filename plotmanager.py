@@ -8,17 +8,17 @@ class PlotManager:
     If there are no data for plot, it returns only the message regarding the data inavailability'''
 
     quantities = \
-        {'Srážky': {'column': 'Precipitations_sum', 'color': 'blue', 'ylabel': 'Suma srážek (mm)'},
-         'Teplota - průměr': {'column': 'Temperatures_avg', 'color': 'green', 'ylabel': 'Průměrná teplota (°C)'},
-         'Teplota - minimum': {'column': 'Temperatures_min_min', 'color': 'purple', 'ylabel': 'Minimální teplota (°C)'},
-         'Teplota - maximum': {'column': 'Temperatures_max_max', 'color': 'red', 'ylabel': 'Maximální teplota (°C)'},
-         'Sluneční svit': {'column': 'Sunshine_sum', 'color': 'yellow', 'ylabel': 'Úhrn slunečního svitu (hod)'},
-         'Sníh': {'column': 'Snow_height_max', 'color': 'lightblue', 'ylabel': 'Maximum sněhové pokrývky (cm)'},
-         'Vítr': {'column': 'Wind_avg', 'color': 'brown', 'ylabel': 'Průměrná rychlost větru (m/s)'},
-         'Arktické dny': {'column': 'Arctic_days', 'color': 'purple', 'ylabel': 'Počet arktických dnů (Tmax < -10 °C)'},
-         'Ledové dny': {'column': 'Ice_days', 'color': 'darkblue', 'ylabel': 'Počet ledových dnů (Tmax < 0 °C)'},
-         'Letní dny': {'column': 'Summer_days', 'color': 'brown', 'ylabel': 'Počet letních dnů (Tmax >= 25 °C)'},
-         'Tropické dny': {'column': 'Tropical_days', 'color': 'red', 'ylabel': 'Počet tropických dnů (Tmax >= 30 °C)'},
+        {'Srážky': {'color': 'blue', 'ylabel': 'Suma srážek (mm)'},
+         'Teplota - průměr': {'color': 'green', 'ylabel': 'Průměrná teplota (°C)'},
+         'Teplota - minimum': {'color': 'purple', 'ylabel': 'Minimální teplota (°C)'},
+         'Teplota - maximum': {'color': 'red', 'ylabel': 'Maximální teplota (°C)'},
+         'Sluneční svit': {'color': 'yellow', 'ylabel': 'Úhrn slunečního svitu (hod)'},
+         'Sníh': {'color': 'lightblue', 'ylabel': 'Maximum sněhové pokrývky (cm)'},
+         'Vítr': {'color': 'brown', 'ylabel': 'Průměrná rychlost větru (m/s)'},
+         'Arktické dny': {'color': 'purple', 'ylabel': 'Počet arktických dnů (Tmax < -10 °C)'},
+         'Ledové dny': {'color': 'darkblue', 'ylabel': 'Počet ledových dnů (Tmax < 0 °C)'},
+         'Letní dny': {'color': 'brown', 'ylabel': 'Počet letních dnů (Tmax >= 25 °C)'},
+         'Tropické dny': {'color': 'red', 'ylabel': 'Počet tropických dnů (Tmax >= 30 °C)'},
          }
 
     filters = \
@@ -35,14 +35,6 @@ class PlotManager:
          'říjen',
          'listopad',
          'prosinec']
-
-
-    avg_selections = \
-        ['Vybrané období',
-         'Normál 1961 - 1990',
-         'Normál 1981 - 2010',
-         'Normál 1991 - 2020'
-         ]
 
 
     station_remarks = \
@@ -111,7 +103,7 @@ class PlotManager:
         self.selection = selection
         self.required_data = self._prepare_required_data()
         self.main_plot_df = self._create_main_plot_dataframe()
-        self.slc_period_stats = self.compute_stats(selection['start_yr'], selection['end_yr'], selection['lintrend'])
+        self.slc_period_stats = self.compute_stats(selection['lintrend'])
 
 
     def _prepare_required_data(self):
@@ -126,22 +118,11 @@ class PlotManager:
         slc = self.selection
 
         # Vyberu data pro danou stanici a velicinu, rok jako index
-        req_data = (PlotManager.source_data
-                         .query("Stanice == @slc['location']")
+        return (PlotManager.source_data
+                         .query("Stanice == @slc['location'] & Měsíc == @slc['filter']")
                          .set_index('Rok')
-                         .loc[:,['Měsíc', slc['quantity']]]
-                        )
-
-        # Zkousim, zda mam ve vybranem obdobi dostupna data
-        # Pokud nemam ve vybranem obdobi zadna data, vracim prazdnou dataframe a dalsi metody s tim pracuji
-        # V opacnem pripade vratim data, ne vsak pouze pro vybrane obdobi
-        # Protoze muzeme chtit zobrazit klimaticky normal, ktery nemusi cely spadat do vybraneho obdobi
-
-        acc_test_data = req_data.query("Měsíc == @slc['filter']").loc[slc['start_yr']:slc['end_yr']].dropna()
-        if acc_test_data.empty:
-            return acc_test_data
-        else:
-            return req_data.query("Měsíc == @slc['filter']").loc[:,[slc['quantity']]].dropna()
+                         .loc[slc['start_yr']:slc['end_yr'],[slc['quantity']]]
+                )
 
 
     def _create_main_plot_dataframe(self):
@@ -160,24 +141,23 @@ class PlotManager:
         return main_plot_df
 
 
-    def compute_stats(self, start_year:int, end_year:int, regression=False):
+    def compute_stats(self, regression=False):
         '''computes basic statistics from the required data
-        for a time period from start_year to end_year
         if regression=True, computes also regression parameters, default False'''
 
         # Slovnik, do ktereho sbiram vysledky
         stats = dict()
 
         # Pokud je DataFrame s pozadovanymi daty pro dane obdobi prazdna, rovnou vracim prazdny slovnik
-        if self.required_data.loc[start_year:end_year].empty:
+        if self.required_data.loc[self.selection['start_yr']:self.selection['end_yr']].empty:
             return stats
 
         # Pokud mame pozadovana data, pocitam a sbiram vysledky
-        eval_data = self.required_data.loc[start_year:end_year].iloc[:,0]
-        stats['mean'] = float(eval_data.mean())
-        stats['min'] = float(eval_data.min())
-        stats['max'] = float(eval_data.max())
-        stats['stdev'] = float(eval_data.std())
+        eval_data = self.required_data.loc[self.selection['start_yr']:self.selection['end_yr']].iloc[:,0]
+        stats['Průměr'] = float(eval_data.mean())
+        stats['Minimum'] = float(eval_data.min())
+        stats['Maximum'] = float(eval_data.max())
+        stats['Směrodatná odchylka'] = float(eval_data.std())
 
         # Dale regrese
         if regression:
@@ -185,13 +165,13 @@ class PlotManager:
             y = eval_data
             a, b = np.polyfit(x, y, 1)
             yhat = a*x + b
-            sstot = np.sum((y - stats['mean'])**2)
+            sstot = np.sum((y - stats['Průměr'])**2)
             ssres = np.sum((y - yhat)**2)
             r2 = 1 - ssres/sstot
 
-            stats['reg_a'] = a
-            stats['reg_b'] = b
-            stats['r2'] = r2
+            stats['a']= float(a)
+            stats['b'] = float(b)
+            stats['R2'] = float(r2)
 
         return stats
 
@@ -223,14 +203,23 @@ class PlotManager:
             else:
                 chart_ttl = f"Stanice: {self.selection['location']}, data za měsíc {self.selection['filter']}"
 
-            # Kompletní nastavení grafu
-            ax.bar(x, y, edgecolor='black', linewidth=1, color=barclr, label=self.selection['quantity'])
+            # Nastaveni grafu - default
+            bar_plot = ax.bar(x, y, edgecolor='black', linewidth=1, color=barclr, label=self.selection['quantity'])
             ax.set_ylabel(ylbl)
             ax.set_xlabel('Rok')
             ax.set_xticks(xticks)
             ax.set_xticklabels(xticks, rotation=75)
             ax.set_title(chart_ttl)
-            ax.grid(linewidth=1, color='grey')
+            ax.grid(linewidth=0.5, color='grey')
+
+            # Pridani popisku dat - custom (0 digits pro charakteristicke dny, jinak 1 digit)
+            if self.selection['bar_labels']:
+                if 'dny' in self.selection['quantity']:
+                    fmt = '%.0f'
+                else:
+                    fmt = '%.1f'
+
+                ax.bar_label(bar_plot, padding=2, color='black', zorder=2, fmt=fmt)
 
 
         def avgline(ax):
@@ -241,7 +230,7 @@ class PlotManager:
             x = self.main_plot_df.index
 
             if self.selection['avg'] == 'Vybrané období':
-                yavg = self.slc_period_stats['mean']
+                yavg = self.slc_period_stats['Průměr']
                 label = f"Průměr {slc['start_yr']} - {slc['end_yr']}"
             else:
                 yavg = (PlotManager
@@ -263,7 +252,7 @@ class PlotManager:
             x = self.main_plot_df.index
             y = self.main_plot_df.iloc[:,0]
 
-            a, b = self.slc_period_stats['reg_a'], self.slc_period_stats['reg_b']
+            a, b = self.slc_period_stats['a'], self.slc_period_stats['b']
             reg_x = np.linspace(x.min(), x.max(), 3)
             reg_y = a * reg_x + np.array(3 * [b])
 
@@ -322,6 +311,30 @@ class PlotManager:
 
         return fig
 
+
+    def table_req(self, kind='stat'):
+        '''Pripravuje data, ktera se zobrazuji v tabulkach
+        Parametr kind muze nabyvat 2 hodnot - "stat" a "reg"
+        "stat" - pripravi se data pro zobrazeni zakladni statistiky za vybrane odobi
+        "reg" - pripravi se data pro zobrazeni regresnich parametru'''
+
+        if kind == "stat":
+            keys = ['Průměr', 'Minimum', 'Maximum', 'Směrodatná odchylka']
+            dict_ = {k:f'{v:.1f}' for k,v in self.slc_period_stats.items() if k in keys}
+            norm_lbound = self.slc_period_stats['Průměr'] - self.slc_period_stats['Směrodatná odchylka']
+            norm_ubound = self.slc_period_stats['Průměr'] + self.slc_period_stats['Směrodatná odchylka']
+            dict_['Interval normálních hodnot'] = f'{norm_lbound:.1f} - {norm_ubound:.1f}'
+        elif kind == "reg":
+            keys = ['a', 'b']
+            dict_ = {k:f'{v:.3f}' for k, v in self.slc_period_stats.items() if k in keys}
+            dict_['R2'] = f"{self.slc_period_stats['R2']:.2f}"
+
+        df_out = pd.DataFrame.from_dict(dict_, orient='index', columns=['Hodnota'])
+        df_out.index.name = 'Parametr'
+
+        return df_out
+
+
 # Az tady musim incializovat class variable data_accessibility, protoze uvnitr class nelze volat class methods
 PlotManager._prepare_data_accessibility_tbl()
 
@@ -329,17 +342,18 @@ if __name__ == '__main__':
     selection = \
         {'location': 'Cheb',
          'filter': 'rok',
-         'quantity': 'Letní dny',
+         'quantity': 'Sníh',
          'sorting': 'chronologické',
          'start_yr': 1961,
          'end_yr': 2020,
          'avg': 'Normál 1961 - 1990',
          'lintrend': True,
-         'roll_avg_window': 10
+         'roll_avg_window': None,
+         'bar_labels':True
          }
 
 
-    print(PlotManager.data_accessibility)
     test_inst = PlotManager(selection)
-    test_inst.plot_req()
-    plt.show()
+    print(test_inst.table_req('reg'))
+    # test_inst.plot_req()
+    # plt.show()

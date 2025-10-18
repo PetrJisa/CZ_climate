@@ -66,15 +66,18 @@ with col3:
 # Nove sloupce pomhaji udrzet format, col6 je placeholder
 # Widgety pouze tehdy, kdy maji pro vybrany casovy interval smysl, col6 je placeholder
 
+col4, col5, col6 = st.columns(3)
+
+with col4:
+    bar_labels = st.checkbox('Popisky dat')
+
 if sorting == 'chronologické':
 
-    col4, col5, col6 = st.columns(3)
-
-    with col4:
+    with col5:
         if end_yr - start_yr > 1:
             lintrend = st.checkbox('Lineární trend')
 
-    with col5:
+    with col6:
         if end_yr - start_yr > 4:
             roll_avg_required = st.checkbox('Klouzavý průměr')
 
@@ -95,7 +98,8 @@ user_selection = \
          'end_yr': end_yr,
          'avg': average,
          'lintrend': lintrend,
-         'roll_avg_window': roll_avg_window
+         'roll_avg_window': roll_avg_window,
+         'bar_labels': bar_labels
          }
 
 # Instance třídy PlotManager podle výběru stanice
@@ -115,4 +119,15 @@ if isinstance(main_result, str):
 else:
     st.pyplot(main_result)
 
-# print(average_selection('Cheb', 'rok', 'Sluneční svit'))
+    col7, col8 = st.columns(2)
+
+    with col7:
+        st.write('Základní statistika')
+        st.table(PM.table_req('stat'))
+
+    if lintrend:
+        with col8:
+            st.write('Regresní parametry')
+            st.table(PM.table_req('reg'))
+
+
