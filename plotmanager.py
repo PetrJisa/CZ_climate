@@ -4,8 +4,7 @@ from matplotlib import pyplot as plt
 
 
 class PlotManager:
-    '''Manages the plotting of climatological data.
-    If there are no data for plot, it returns only the message regarding the data inavailability'''
+    '''Obstarava veskery data handling s cilem dosazeni zadanych vystupu'''
 
     quantities = \
         {'Srážky': {'color': 'blue', 'ylabel': 'Suma srážek (mm)'},
@@ -102,6 +101,7 @@ class PlotManager:
 
         self.selection = selection
         self.required_data = self._prepare_required_data()
+        self.missing_count = self._count_missing_years()
         self.main_plot_df = self._create_main_plot_dataframe()
         self.slc_period_stats = self.compute_stats(selection['lintrend'])
 
@@ -119,17 +119,25 @@ class PlotManager:
 
         # Vyberu data pro danou stanici a velicinu, rok jako index
         return (PlotManager.source_data
-                         .query("Stanice == @slc['location'] & Měsíc == @slc['filter']")
-                         .set_index('Rok')
-                         .loc[slc['start_yr']:slc['end_yr'],[slc['quantity']]]
+                        .query("Stanice == @slc['location'] & Měsíc == @slc['filter']")
+                        .set_index('Rok')
+                        .loc[slc['start_yr']:slc['end_yr'],[slc['quantity']]]
+                        .dropna()
                 )
+
+
+    def _count_missing_years(self):
+        '''Pocita, pro kolik roku pri danem vyberu chybi data'''
+        expected = self.selection['end_yr'] - self.selection['start_yr']
+        real = self.required_data.shape[0]
+        return expected - real
 
 
     def _create_main_plot_dataframe(self):
         '''Pri chronologickem razeni dat se vrati self.required_data
         Pri ostatnich se vrati serazena dataframe se stringovym indexem'''
 
-        plot_df_base = self.required_data.loc[self.selection['start_yr']:self.selection['end_yr']]
+        plot_df_base = self.required_data
 
         if self.selection['sorting'] != 'chronologické':
             sort_type = {'vzestupné': True, 'sestupné': False}
@@ -149,11 +157,11 @@ class PlotManager:
         stats = dict()
 
         # Pokud je DataFrame s pozadovanymi daty pro dane obdobi prazdna, rovnou vracim prazdny slovnik
-        if self.required_data.loc[self.selection['start_yr']:self.selection['end_yr']].empty:
+        if self.required_data.empty:
             return stats
 
         # Pokud mame pozadovana data, pocitam a sbiram vysledky
-        eval_data = self.required_data.loc[self.selection['start_yr']:self.selection['end_yr']].iloc[:,0]
+        eval_data = self.required_data.iloc[:,0]
         stats['Průměr'] = float(eval_data.mean())
         stats['Minimum'] = float(eval_data.min())
         stats['Maximum'] = float(eval_data.max())

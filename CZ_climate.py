@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from plotmanager import PlotManager
 
 # Inicializace promennych, do kterych se ukladaji nepovinne vybery uzivatele
@@ -117,6 +116,10 @@ main_result = PM.plot_req()
 if isinstance(main_result, str):
     st.write(main_result)
 else:
+    if PM.missing_count > 0:
+        warning = f'POZOR! Chybějící data, počet let = {PM.missing_count}'
+        st.markdown(f"<h6 style='text-align: left; color: red'>{warning}</h6>", unsafe_allow_html=True)
+
     st.pyplot(main_result)
 
     col7, col8 = st.columns(2)
