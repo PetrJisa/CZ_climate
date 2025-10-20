@@ -107,12 +107,7 @@ class PlotManager:
 
 
     def _prepare_required_data(self):
-        '''Returns dataframe which is necessary as a data source for all plots and calculations
-        Resulting dataframe is set as an instance attribute plot_data
-
-        REFACTORING NOTE:
-        Evaluate the relation of avg and start_yr and return dataframe from min(avg, start_yr)
-        Because the solution for station normals - coming back to source data - is really ugly'''
+        '''Returns dataframe which is necessary as a data source for all plots and calculations'''
 
         # Selekce v samostatne promenne pro snazsi referencovani
         slc = self.selection
@@ -166,8 +161,8 @@ class PlotManager:
         stats['Minimum'] = float(eval_data.min())
         stats['Maximum'] = float(eval_data.max())
         stats['Směrodatná odchylka'] = float(eval_data.std())
-        stats['Dolní tercil'] = float(np.quantile(eval_data, 1/3))
-        stats['Horní tercil'] = float(np.quantile(eval_data, 2/3))
+        stats['Dolní kvartil'] = float(np.quantile(eval_data, 1/4))
+        stats['Horní kvartil'] = float(np.quantile(eval_data, 3/4))
 
         # Dale regrese
         if regression:
@@ -331,9 +326,9 @@ class PlotManager:
         if kind == "stat":
             keys = ['Průměr', 'Minimum', 'Maximum', 'Směrodatná odchylka']
             dict_ = {k:f'{v:.1f}' for k,v in self.slc_period_stats.items() if k in keys}
-            norm_lbound = self.slc_period_stats['Dolní tercil']
-            norm_ubound = self.slc_period_stats['Horní tercil']
-            dict_['Interval normálních hodnot'] = f'{norm_lbound:.1f} - {norm_ubound:.1f}'
+            norm_lbound = self.slc_period_stats['Dolní kvartil']
+            norm_ubound = self.slc_period_stats['Horní kvartil']
+            dict_['Mezikvartilové rozpětí'] = f'{norm_lbound:.1f} - {norm_ubound:.1f}'
         elif kind == "reg":
             keys = ['a', 'b']
             dict_ = {k:f'{v:.3f}' for k, v in self.slc_period_stats.items() if k in keys}
